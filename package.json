@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Chat GPT Slack Bot",
   "scripts": {
-    "build": "npm run clean && NODE_EN=production webpack",
+    "build": "npm run clean && SET NODE_ENV=production webpack",
     "clean": "rm -rf dist",
     "lint": "eslint -c .eslintrc.yml --ext .js app/",
     "lint:fix": "eslint --fix -c .eslintrc.yml --ext .js app/",

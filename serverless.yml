@@ -1,3 +1,5 @@
+org: ngong
+app: gptbot
 service: gptbot
 
 provider:
@@ -31,7 +33,7 @@ provider:
 functions:
   acknowledgerFunction:
     handler: dist/acknowledger.handler
-    provisionedConcurrency: 1
+    provisionedConcurrency: 5
     events:
       - httpApi: 'POST /slack/events'
   botFunction:
