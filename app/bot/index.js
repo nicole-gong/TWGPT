@@ -1,6 +1,5 @@
-const Pinecone = require("@pinecone-database/pinecone")
 const { App } = require("@slack/bolt");
-const { Configuration, OpenAIApi, QueryRequest } = require("openai");
+const { Configuration, OpenAIApi } = require("openai");
 const {
     getConversation,
     updateConversationHistory,
@@ -9,50 +8,23 @@ const {
 const { SLACK_SIGNING_SECRET, SLACK_BOT_TOKEN, OPENAI_API_KEY, PINECONE_API_KEY } = process.env;
 const DEFAULT_MODEL = "gpt-3.5-turbo";
 
-const pinecone = new Pinecone();
-pinecone.init({
-    environment: "gcp-starter",
-    apiKey: PINECONE_API_KEY,
-});
-const index = pinecone.Index("canopy--document-uploader");
-
 const app = new App({
     token: SLACK_BOT_TOKEN,
     signingSecret: SLACK_SIGNING_SECRET,
 });
 
-const content = index[0].content;
 const configuration = new Configuration({
     apiKey: OPENAI_API_KEY,
 });
-
 const openai = new OpenAIApi(configuration);
-const embeddingResponse = openai.createEmbedding({
-    model: "text-embedding-ada-002",
-    input: content,
-});
-
-const [{ embedding }] = embeddingResponse.data.data;
-const queryRequest = new QueryRequest = {
-    vector: embedding, // the query embedding
-    topK: 5,
-    includeValues: false,
-    includeMetadata: true,
-    namespace: "handbook-namespace",
-};
-
-const queryResponse = index.query({ queryRequest });
-const uniqueFullContents = queryResponse.matches
-    .map((m) => m.metadata)
-    .map((m) => m.fullContent)
-    .reduce(reduceToUniqueValues, []);
 
 const BOT_SYSTEM_PROMPT = "You are a very enthusiastic Variant representative who \
 loves to help people! Given the following sections from the Variant handbook, answer \
 the question using only that information. If you are unsure and the answer is not \
 written in the handbook, say 'Sorry, I don't know how to help with that.' Please do not \
 write URLs that you cannot find in the context section. \
-Context section:" + uniqueFullContents.join("\n---\n");
+Context section:" + PROMPT_CONTENT.join("\n---\n");
+// add prompt data here ^
 
 async function chatGPTReply({ channel, message, conversation }) {
     const history = conversation ? conversation.history : [];
