@@ -1,0 +1,1 @@
+This pinecone pdf uploader was made by following the repository mayooear/gpt4-pdf-chatbot-langchain
