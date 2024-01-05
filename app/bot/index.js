@@ -1,5 +1,6 @@
+const Pinecone = require("@pinecone-database/pinecone")
 const { App } = require("@slack/bolt");
-const { Configuration, OpenAIApi } = require("openai");
+const { Configuration, OpenAIApi, QueryRequest } = require("openai");
 const {
     getConversation,
     updateConversationHistory,
@@ -8,11 +9,11 @@ const {
 const { SLACK_SIGNING_SECRET, SLACK_BOT_TOKEN, OPENAI_API_KEY, PINECONE_API_KEY } = process.env;
 const DEFAULT_MODEL = "gpt-3.5-turbo";
 
-const pinecone = new Pinecone();      
-pinecone.init({      
-	environment: "gcp-starter",      
-	apiKey: PINECONE_API_KEY,      
-});      
+const pinecone = new Pinecone();
+pinecone.init({
+    environment: "gcp-starter",
+    apiKey: PINECONE_API_KEY,
+});
 const index = pinecone.Index("canopy--document-uploader");
 
 const app = new App({
@@ -32,7 +33,7 @@ const embeddingResponse = openai.createEmbedding({
 });
 
 const [{ embedding }] = embeddingResponse.data.data;
-const queryRequest = QueryRequest = {
+const queryRequest = new QueryRequest = {
     vector: embedding, // the query embedding
     topK: 5,
     includeValues: false,
