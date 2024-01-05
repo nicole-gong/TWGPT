@@ -37,10 +37,10 @@ app.command("/gptbot", async ({ command, ack, respond, say }) => {
         await respond(
             `You have started a conversation with GPTBot in this channel using the engine '${selectedModel}'.`
         );
-        await say("Hey there :wave: How can I help?");
+        await say(":pleased_wensen: How can I help?");
     } else if (action === "stop") {
         await deleteConversation(channel);
-        await say("Until next time! :call_me_hand: Take care!");
+        await say(":displeasedwensen: Take care!");
         await respond(
             "You have stopped the conversation with GPTBot in this channel."
         );

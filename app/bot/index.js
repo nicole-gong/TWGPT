@@ -5,19 +5,53 @@ const {
     updateConversationHistory,
 } = require("../../app/common/dynamo");
 
-const { SLACK_SIGNING_SECRET, SLACK_BOT_TOKEN, OPENAI_API_KEY } = process.env;
+const { SLACK_SIGNING_SECRET, SLACK_BOT_TOKEN, OPENAI_API_KEY, PINECONE_API_KEY } = process.env;
 const DEFAULT_MODEL = "gpt-3.5-turbo";
+
+const pinecone = new Pinecone();      
+pinecone.init({      
+	environment: "gcp-starter",      
+	apiKey: PINECONE_API_KEY,      
+});      
+const index = pinecone.Index("canopy--document-uploader");
 
 const app = new App({
     token: SLACK_BOT_TOKEN,
     signingSecret: SLACK_SIGNING_SECRET,
 });
 
+const content = index[0].content;
 const configuration = new Configuration({
     apiKey: OPENAI_API_KEY,
 });
+
 const openai = new OpenAIApi(configuration);
-const BOT_SYSTEM_PROMPT = "You are a helpful assistant.";
+const embeddingResponse = openai.createEmbedding({
+    model: "text-embedding-ada-002",
+    input: content,
+});
+
+const [{ embedding }] = embeddingResponse.data.data;
+const queryRequest = QueryRequest = {
+    vector: embedding, // the query embedding
+    topK: 5,
+    includeValues: false,
+    includeMetadata: true,
+    namespace: "handbook-namespace",
+};
+
+const queryResponse = index.query({ queryRequest });
+const uniqueFullContents = queryResponse.matches
+    .map((m) => m.metadata)
+    .map((m) => m.fullContent)
+    .reduce(reduceToUniqueValues, []);
+
+const BOT_SYSTEM_PROMPT = "You are a very enthusiastic Variant representative who \
+loves to help people! Given the following sections from the Variant handbook, answer \
+the question using only that information. If you are unsure and the answer is not \
+written in the handbook, say 'Sorry, I don't know how to help with that.' Please do not \
+write URLs that you cannot find in the context section. \
+Context section:" + uniqueFullContents.join("\n---\n");
 
 async function chatGPTReply({ channel, message, conversation }) {
     const history = conversation ? conversation.history : [];
@@ -46,6 +80,8 @@ async function chatGPTReply({ channel, message, conversation }) {
                 await updateConversationHistory(channel, updatedHistory);
             }
             return reply;
+            // this bit isn't even necessary, um... it turns out that my free trial credits were just
+            // expired and i had to buy more
         } catch (error) {
             if (error.response && error.response.status === 429) {
                 const waitTime = Math.pow(2, retries) * 1000; // Exponential backoff in milliseconds
@@ -78,7 +114,7 @@ async function handleNewMessage({ channel, userMessage, botUserId, subtype }) {
     if (isMentioned && !isConversationMode) {
         await app.client.chat.postMessage({
             channel: channel,
-            text: "Hey there :wave: Let me take a look at this for you!",
+            text: ":pleased_wensen: Let me take a look at this for you!",
         });
     }
 
@@ -95,7 +131,7 @@ async function handleNewMessage({ channel, userMessage, botUserId, subtype }) {
             });
             await app.client.chat.postMessage({
                 channel: channel,
-                text: "CHATGPT'S REPLY IS: " + reply,
+                text: reply,
             });
         }
     }

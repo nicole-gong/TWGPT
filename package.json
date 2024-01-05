@@ -34,6 +34,7 @@
     "webpack-node-externals": "^3.0.0"
   },
   "dependencies": {
+    "@pinecone-database/pinecone": "^1.1.2",
     "@serverless/sdk": "^0.5.26",
     "@slack/bolt": "^3.12.2",
     "aws-sdk": "^2.1354.0",
