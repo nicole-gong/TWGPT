@@ -1,0 +1,7 @@
+dist
+chatbot/node_modules
+pdfscraper/pineconeuploader/node_modules
+pdfscraper/documents
+.serverless
+.envrc
+.bashrc
