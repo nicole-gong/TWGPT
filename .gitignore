@@ -1,7 +1,8 @@
 dist
 chatbot/node_modules
-pdfscraper/pineconeuploader/node_modules
-pdfscraper/documents
+chatbot/.envrc
+pdfscraper/node_modules
+pdfscraper/docs
 .serverless
 .envrc
 .bashrc

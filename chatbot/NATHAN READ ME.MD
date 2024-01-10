@@ -1,7 +1,5 @@
 insert relevant api keys into file .envrc 
-export SLACK_BOT_TOKEN=" "
-export SLACK_SIGNING_SECRET=" "
-export OPENAI_API_KEY=" "
+ex: export SLACK_BOT_TOKEN=" "
 
 add this file into the environment (in bash it's "source .envrc")
 

@@ -1,72 +1,99 @@
 const { App } = require("@slack/bolt");
-const { Configuration, OpenAIApi } = require("openai");
 const {
     getConversation,
     updateConversationHistory,
 } = require("../../app/common/dynamo");
 
-const { SLACK_SIGNING_SECRET, SLACK_BOT_TOKEN, OPENAI_API_KEY, PINECONE_API_KEY } = process.env;
-const DEFAULT_MODEL = "gpt-3.5-turbo";
+const { SLACK_SIGNING_SECRET, SLACK_BOT_TOKEN } = process.env;
+
+const { OpenAI } = require('langchain/llms/openai');
+const { ConversationalRetrievalQAChain } = require('langchain/chains');
+const { PineconeClient } = require('@pinecone-database/pinecone');
+const { PineconeStore } = require('langchain/vectorstores/pinecone');
+const { OpenAIEmbeddings } = require('langchain/embeddings/openai');
 
 const app = new App({
     token: SLACK_BOT_TOKEN,
     signingSecret: SLACK_SIGNING_SECRET,
 });
 
-const configuration = new Configuration({
-    apiKey: OPENAI_API_KEY,
-});
-const openai = new OpenAIApi(configuration);
+// https://github.com/martinseanhunt/slack-gpt/blob/main/config/prompts.js
+const QA_PROMPT = `You are a helpful AI assistant. Use the following pieces of context to answer the question at the end.
+If you don't know the answer, just say you don't know. DO NOT try to make up an answer.
+If the question is not related to the context, politely respond that you are tuned to only answer questions that are related to the context.
+Answer in formatted mrkdwn, use only Slack-compatible mrkdwn, such as bold (*text*), italic (_text_), strikethrough (~text~), and lists (1., 2., 3.).
 
-const BOT_SYSTEM_PROMPT = "You are a very enthusiastic Variant representative who \
-loves to help people! Given the following sections from the Variant handbook, answer \
-the question using only that information. If you are unsure and the answer is not \
-written in the handbook, say 'Sorry, I don't know how to help with that.' Please do not \
-write URLs that you cannot find in the context section. \
-Context section:" + PROMPT_CONTENT.join("\n---\n");
-// add prompt data here ^
+=========
+{question}
+=========
+{context}
+=========
+Answer in Slack-compatible mrkdwn:
+`;
+const CONDENSE_PROMPT = `Given the following conversation and a follow up question, rephrase the follow up question to be a standalone question. If the follow up question is not closesly related to the chat history, the chat history must be ignored when generating the standalone question and your job is to repeat the follow up question exactly. 
 
+Chat History:
+{chat_history}
+Follow Up Input: {question}
+Standalone question:`;
+
+// https://github.com/martinseanhunt/slack-gpt/blob/main/lib/getLLMResponse.js
+const getLLMResponse = async (question, history) => {
+    // Sanitise the question - OpenAI reccomends replacing newlines with spaces
+    question = question.trim().replace('\n', ' ');
+
+    // Inntialise pinecone client
+    const pinecone = new PineconeClient();
+    await pinecone.init({
+        environment: process.env.PINECONE_ENVIRONMENT,
+        apiKey: process.env.PINECONE_API_KEY,
+    });
+
+    // Set Pinecone index name
+    const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX_NAME);
+
+    // Set up index
+    const vectorStore = await PineconeStore.fromExistingIndex(
+        new OpenAIEmbeddings(),
+        {
+            pineconeIndex: pineconeIndex,
+            textKey: 'text',
+            namespace: process.env.PINECONE_NAME_SPACE,
+        }
+    );
+
+    // Initialise the model
+    const model = new OpenAI({
+        temperature: 0,
+        maxTokens: 2000,
+        modelName: 'gpt-3.5-turbo',
+        cache: true,
+    });
+
+    // Set up the chain
+    const chain = ConversationalRetrievalQAChain.fromLLM(
+        model,
+        vectorStore.asRetriever(5),
+        {
+            returnSourceDocuments: true,
+            questionGeneratorTemplate: CONDENSE_PROMPT,
+            qaTemplate: QA_PROMPT,
+        }
+    );
+
+    // Call the chain, pass the question and chat history
+    const response = await chain.call({
+        question,
+        chat_history: history || [],
+    });
+
+    return response;
+};
 async function chatGPTReply({ channel, message, conversation }) {
     const history = conversation ? conversation.history : [];
-    const model = conversation ? conversation.model : DEFAULT_MODEL;
     const prompt = { role: "user", content: message };
 
-    let retries = 0;
-    const maxRetries = 3;
-    while (retries < maxRetries) {
-        try {
-            const completion = await openai.createChatCompletion({
-                model,
-                messages: [
-                    { role: "system", content: BOT_SYSTEM_PROMPT },
-                    ...history,
-                    prompt,
-                ],
-            });
-            const reply = completion.data.choices[0].message.content.trim();
-            if (conversation) {
-                const updatedHistory = [
-                    ...history,
-                    prompt,
-                    { role: "assistant", content: reply },
-                ];
-                await updateConversationHistory(channel, updatedHistory);
-            }
-            return reply;
-            // this bit isn't even necessary, um... it turns out that my free trial credits were just
-            // expired and i had to buy more
-        } catch (error) {
-            if (error.response && error.response.status === 429) {
-                const waitTime = Math.pow(2, retries) * 1000; // Exponential backoff in milliseconds
-                console.log(`Rate limit exceeded. Retrying in ${waitTime / 1000} seconds...`);
-                await new Promise(resolve => setTimeout(resolve, waitTime));
-                retries++;
-            } else {
-                // Handle other types of errors
-                throw error;
-            }
-        }
-    }
+    return getLLMResponse(message, history)
 }
 
 async function handleNewMessage({ channel, userMessage, botUserId, subtype }) {
