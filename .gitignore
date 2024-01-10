@@ -1,8 +1,6 @@
 dist
 chatbot/node_modules
 chatbot/.envrc
-gpt4-pdf-chatbot-langchain/node_modules
-gpt4-pdf-chatbot-langchain/docs
 chatbot/.serverless
 .envrc
 .bashrc
