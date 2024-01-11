@@ -43,10 +43,9 @@ const getLLMResponse = async (question, history) => {
     question = question.trim().replace('\n', ' ');
 
     // Inntialise pinecone client
-    const pinecone = new Pinecone();
-    await pinecone.init({
+    const pinecone = new Pinecone({
         environment: process.env.PINECONE_ENVIRONMENT,
-        apiKey: process.env.PINECONE_API_KEY,
+        apiKey: process.env.PINECONE_API_KEY,        
     });
 
     console.log(pinecone.listIndexes());
