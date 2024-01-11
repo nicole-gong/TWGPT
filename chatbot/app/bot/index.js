@@ -8,7 +8,7 @@ const { SLACK_SIGNING_SECRET, SLACK_BOT_TOKEN } = process.env;
 
 const { OpenAI } = require('langchain/llms/openai');
 const { ConversationalRetrievalQAChain } = require('langchain/chains');
-const { PineconeClient } = require('@pinecone-database/pinecone');
+const { Pinecone } = require('@pinecone-database/pinecone');
 const { PineconeStore } = require('langchain/vectorstores/pinecone');
 const { OpenAIEmbeddings } = require('langchain/embeddings/openai');
 
@@ -43,11 +43,14 @@ const getLLMResponse = async (question, history) => {
     question = question.trim().replace('\n', ' ');
 
     // Inntialise pinecone client
-    const pinecone = new PineconeClient();
+    const pinecone = new Pinecone();
     await pinecone.init({
         environment: process.env.PINECONE_ENVIRONMENT,
         apiKey: process.env.PINECONE_API_KEY,
     });
+
+    console.log(pinecone.listIndexes());
+    console.log(pinecone.describeIndex('ifl'));
 
     // Set Pinecone index name
     const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX_NAME);
